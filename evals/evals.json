@@ -1,0 +1,42 @@
+{
+  "skill_name": "postgres-backup-restore",
+  "safety_note": "These prompts are advisory by design. Subagents are explicitly instructed NOT to execute any state-changing database command against a real production database. They must produce the plan and exact commands instead.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "backup-clone-not-production",
+      "prompt": "Before I wipe the test database I need a backup of it. It's a clone on this box - lives at /data/db-clone, has its own socket in there, runs on port 55432. We've got scripts/db_backup.sh in the repo and I want the backup on the backup drive (/mnt/backup_db), not the default spot. Give me the exact commands and tell me how I'll know the backup is actually trustworthy afterward. Don't run anything yet, I want to read it over first.",
+      "expected_output": "Commands passing host/port as explicit flags (e.g. PGDUMP_HOST/PGDUMP_PORT or -h/-p) rather than exported PGHOST/PGPORT, explaining that sudo strips the environment so exports would silently dump production instead. Backup directory set explicitly to /mnt/backup_db with the reason (a script's default is often a fuller, different device). A pre-flight check proving which data_directory/port the connection reaches. Verification that includes actually re-reading the checksums (sha256sum -c), not just noting .status/.verify sidecars, plus a restore-and-count spot check.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "collation-fix-by-dump-reload",
+      "prompt": "the OS updated its glibc and now postgres keeps warning me that my main database was created with collation version 2.43 but the OS has 2.44. i'd rather fix it by dumping and reloading into a fresh database than by reindexing in place, because i want to be able to back out if it goes wrong. the db is about 550GB. walk me through the whole thing including how i'd swap it in and what could bite me. don't execute anything.",
+      "expected_output": "Explains why a logical reload fixes it (dump stores CREATE INDEX statements, not index contents, so indexes rebuild under the current library and a new database records the current version). Creates the target from template0 and explains that template1 hard-fails on a mismatched cluster. Rename-swap cutover retaining the old database as rollback. Names the write-freeze/data-loss window: writes after the dump starts are lost, not delayed, spanning dump+restore+verify+swap. Post-restore verification including collation version, exact count(*) not reltuples, ownership/grants/extensions.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "is-this-backup-actually-good",
+      "prompt": "i have a pg_dump backup from yesterday sitting at /mnt/backup_db/mydb_full_2026-08-04.pgdir. the .status file says OK and the .verify file says VERIFY_OK and there's a SHA256SUMS file next to it. is that enough to know it's good? if not what should i actually do? read-only checks only please, don't restore anything over the top of anything.",
+      "expected_output": "Explains that those signals prove less than they appear to: exit 0 means the process didn't crash, a SHA256SUMS file means hashes were computed while writing (not re-read), and pg_restore --list only parses the table of contents without reading data blocks. Recommends running sha256sum -c to actually re-read, comparing manifest line count against file count, and a restore-and-count spot check into a scratch database (created from template0) as the only step proving the data is usable. May point at scripts/verify_pg_dump.sh.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "negative-control-not-a-backup-task",
+      "is_negative_control": true,
+      "prompt": "analysts keep asking me for recent orders and every query they write hammers the orders table, which is 428GB and mostly wide text/jsonb columns. i want to give them a much smaller table with just the last 6 months - maybe 200k rows, and only the columns they actually use (id, customer_name, order_date, status) - so they stop timing out on me. whats the cleanest way to set that up so it stays reasonably current without me babysitting it? postgres 18.",
+      "expected_output": "This is a data-modeling / derived-table question, NOT a backup or restore task. A good answer discusses a materialized view with a refresh strategy, or a narrow derived table populated by INSERT INTO ... SELECT plus a scheduled refresh or trigger, indexing on order_date, and possibly partitioning or a partial index. It should NOT drift into pg_dump, pg_restore, template0, checksum verification, or write-freeze planning. The skill being available should not push the answer toward backup ceremony; if the with_skill run is materially worse or slower than baseline here, the skill is over-triggering or over-applying and its description or scoping needs tightening.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "shared-preload-libraries-multivalue-trap",
+      "prompt": "i need to add pg_prewarm to shared_preload_libraries alongside pg_stat_statements, which is already loaded and in active use. give me the exact ALTER SYSTEM statement and restart plan. don't run anything yet, i want to review it first.",
+      "expected_output": "Writes shared_preload_libraries as multiple quoted values, e.g. ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements', 'pg_prewarm'; and explicitly warns against the single-string form 'pg_stat_statements,pg_prewarm', which PostgreSQL writes to postgresql.auto.conf as one library literally named with the comma in it and then refuses to start (FATAL: could not access file ...). Notes shared_preload_libraries is PGC_POSTMASTER context, so pg_reload_conf() does nothing and a full restart is required. Recommends checking pg_settings.sourcefile/sourceline first, because ALTER SYSTEM writes postgresql.auto.conf, which overrides postgresql.conf and is easy to edit the wrong file for. Recommends rehearsing on a separate initdb'd scratch cluster (a second database in the same server does NOT work, because this setting is per-server, not per-database) including deliberately breaking it and recovering via hand-edit of postgresql.auto.conf with the server stopped, and keeping a dated backup of postgresql.auto.conf before editing.",
+      "files": []
+    }
+  ]
+}
