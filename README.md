@@ -1,4 +1,4 @@
-# postgres-backup-restore
+# postgres-backup-restore - "How to take a really good dump"
 
 A [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) for
 PostgreSQL backup, verification, restore, and cutover work — producing a dump you
