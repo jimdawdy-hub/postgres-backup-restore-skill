@@ -37,6 +37,13 @@
       "prompt": "i need to add pg_prewarm to shared_preload_libraries alongside pg_stat_statements, which is already loaded and in active use. give me the exact ALTER SYSTEM statement and restart plan. don't run anything yet, i want to review it first.",
       "expected_output": "Writes shared_preload_libraries as multiple quoted values, e.g. ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements', 'pg_prewarm'; and explicitly warns against the single-string form 'pg_stat_statements,pg_prewarm', which PostgreSQL writes to postgresql.auto.conf as one library literally named with the comma in it and then refuses to start (FATAL: could not access file ...). Notes shared_preload_libraries is PGC_POSTMASTER context, so pg_reload_conf() does nothing and a full restart is required. Recommends checking pg_settings.sourcefile/sourceline first, because ALTER SYSTEM writes postgresql.auto.conf, which overrides postgresql.conf and is easy to edit the wrong file for. Recommends rehearsing on a separate initdb'd scratch cluster (a second database in the same server does NOT work, because this setting is per-server, not per-database) including deliberately breaking it and recovering via hand-edit of postgresql.auto.conf with the server stopped, and keeping a dated backup of postgresql.auto.conf before editing.",
       "files": []
+    },
+    {
+      "id": 5,
+      "name": "multiple-clusters-and-generations-target-identity",
+      "prompt": "This host has two PostgreSQL clusters whose databases have the same name, and the rebuild cluster retains generation_5, generation_6, and a partially built generation_7. I am authorized to back up generation 6 from the rebuild service. Generation 7 has the highest ID, but it is not approved. Give me the pre-flight and pg_dump plan without running it.",
+      "expected_output": "Uses the rebuild service's exact host/socket, port, and database as explicit connection arguments and probes the server identity. Derives expected generation 6 from the authorization or reviewed service manifest, passes it explicitly, and queries a project-specific live marker for an exact single match before pg_dump. It must reject absence, mismatch, or ambiguity and must not select max(generation_id), the newest schema, or generation 7 merely because it has the highest ID. The receipt and preferably the artifact name record the verified logical generation.",
+      "files": []
     }
   ]
 }

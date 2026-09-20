@@ -1,6 +1,6 @@
 # postgres-backup-restore - "How to take a really good dump"
 
-A [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) for
+A skill for Claude Code and OpenAI Codex that covers
 PostgreSQL backup, verification, restore, and cutover work — producing a dump you
 can actually trust, restoring it safely, and swapping a restored database into
 production. Database-agnostic: nothing in here assumes any particular schema,
@@ -17,7 +17,8 @@ there.
 
 This skill's organizing idea is **prove each claim separately, from outside the
 thing making the claim.** A tool reporting its own success is not evidence. It
-walks Claude through the checks that actually matter, in the order they matter,
+walks the coding agent through the checks that actually matter, in the order they
+matter,
 and gives it two small scripts so it isn't reinventing fiddly verification logic
 each time.
 
@@ -41,7 +42,7 @@ each time.
 - **Fixing a collation-version mismatch** — the actual mechanism, both remedies
   (`REINDEX` vs dump-and-reload), and why row counts alone never verify the fix.
 
-## Install
+## Install for Claude Code
 
 Drop this directory into your Claude Code skills folder:
 
@@ -53,6 +54,21 @@ git clone https://github.com/jimdawdy-hub/postgres-backup-restore-skill.git \
 Claude Code picks up skills automatically from `~/.claude/skills/`. See the
 [Claude Code skills documentation](https://docs.claude.com/en/docs/claude-code/skills)
 for project-scoped installs and other options.
+
+## Install for Codex
+
+The Codex-ready package is under `codex/postgres-backup-restore/`. Copy that
+directory into the Codex skills folder:
+
+```bash
+git clone https://github.com/jimdawdy-hub/postgres-backup-restore-skill.git \
+  /tmp/postgres-backup-restore-skill
+mkdir -p ~/.codex/skills
+cp -a /tmp/postgres-backup-restore-skill/codex/postgres-backup-restore \
+  ~/.codex/skills/
+```
+
+Restart Codex after installation so it discovers the new skill.
 
 ## Structure
 
@@ -69,10 +85,14 @@ scripts/
 evals/
   evals.json                      behavioral test prompts (works with the
                                    skill-creator eval harness)
+codex/postgres-backup-restore/    Codex-ready copy of SKILL.md, references,
+                                   and scripts
 ```
 
 `SKILL.md` stays short and points to the reference file each task actually needs —
-Claude loads only what's relevant instead of one long document.
+the agent loads only what's relevant instead of one long document. The root
+package and the Codex package intentionally contain the same operational
+guidance so safeguards do not drift between agents.
 
 ## A note on the numbers in here
 
